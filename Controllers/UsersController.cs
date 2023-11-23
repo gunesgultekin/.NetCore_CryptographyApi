@@ -56,6 +56,7 @@ namespace PUBLIC_KEY_INFRASTRUCTURE.Controllers
 
                 var message = _context.Messages.ToList()[0];
                 
+
                 
 
                 string pemX509 = "-----BEGIN PUBLIC KEY-----"
