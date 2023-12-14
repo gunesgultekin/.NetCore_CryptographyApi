@@ -5,7 +5,7 @@ This project was developed with the aim of implementing file encryption, decrypt
 * Change "connectionString" within the /Context/connectionConfiguration.cs with your own MSSQL database connection string
 * Connection string format:
 * "Data Source= (your pc name ) \\SQLEXPRESS; Initial Catalog = (your database name); Integrated Security = True; TrustServerCertificate=True"
-* 
+  
 * Since Entity Framework ORM has used in this project, you must initialize two database tables named as "Messages" and "Users".
 * Messages table consists of the attributes "id", "messageBody" and "digitalSignature"
 * Users table consists of the attributes "id", "username" "publicKey", "privateKey", "aesKey" and "aesIV"
