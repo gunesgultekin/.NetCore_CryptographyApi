@@ -11,3 +11,4 @@
 * symmetricDecryption function takes a filepath then decrypt this file using the symmetric aes key received from the sender
 
 * createDigitalSignature function takes a filepath then first calculates the SHA-512 value of the file then encrypts the hashed file with asymmetric RSA algorithm using sender's private key
+* verifyDigitalSignature function takes a filepath then first decrypts the file with asymmetric RSA algorithm using sender's public key then compare decrypted value with hash value of the received file. If hashed value equals to the decrpyted value then signature will ve verified.
