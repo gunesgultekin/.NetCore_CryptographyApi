@@ -1,13 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using PUBLIC_KEY_INFRASTRUCTURE.Context;
 using PUBLIC_KEY_INFRASTRUCTURE.Entities;
-using System.Runtime.Intrinsics.Arm;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Security.Cryptography.Xml;
 using System.Text;
-using System.Xml.Linq;
 
 namespace PUBLIC_KEY_INFRASTRUCTURE.Controllers
 {
@@ -20,227 +19,430 @@ namespace PUBLIC_KEY_INFRASTRUCTURE.Controllers
         public UsersController(DBContext context)
         {
             this._context = context;
+            
+          
         }
 
-
-        static string Generate2048BitString()
+        // ENCRYPT DESIRED FILE WITH SYMMETRIC AES ENCRYPTION
+        [HttpGet("symmetricEncryption")]
+        public void symmetricEncrypion(string filePath)
         {
-            using (RandomNumberGenerator rng = RandomNumberGenerator.Create())
-            {
-                byte[] randomBytes = new byte[256]; // 2048 bits / 8 bits per byte = 256 bytes
-                rng.GetBytes(randomBytes);
 
-                // Convert the random bytes to a string representation
-                StringBuilder stringBuilder = new StringBuilder();
-                foreach (byte b in randomBytes)
+            var checkDuplicate = _context.Messages.FirstOrDefault(m => m.messageBody == filePath); // CHECK IS GIVEN FILE PATH DUPLICATED
+
+            if (checkDuplicate == null) // IF FILE PATH IS UNIQUE
+            {
+                // GENERATE A NEW OUTPUT PATH FOR THE FILE TO BE ENCRYPTED 
+                // ENCRYPTED FILE WILL BE SAVED TO YOUR DESKTOP AS "EncryptedFile"
+                string outputFilePath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "EncryptedFile" + Path.GetExtension(filePath));
+                
+
+                // AES ENCRYPTION PROCESS
+                using (FileStream fsInput = new FileStream(filePath, FileMode.Open)) // OPEN THE FILE AT THE GIVEN ADDRESS
                 {
-                    stringBuilder.Append(b.ToString("X2")); // Hexadecimal representation
+                    using (FileStream fsOutput = new FileStream(outputFilePath, FileMode.Create)) // CREATE A NEW OUTPUT FILE as "EncrypedFile"
+                    {
+                        using (AesManaged aes = new AesManaged())
+                        {
+                            aes.GenerateKey(); // GENERATE SYMMETRIC AES KEY
+                            aes.GenerateIV(); 
+
+                            var sender = _context.Users.FirstOrDefault(u => u.username == "A"); // GET USER A (SENDER) FROM DATABASE
+                            sender.aesKey = aes.Key; // SAVE SENDER'S SYMMETRIC AES KEY 
+                            sender.aesIV = aes.IV;
+                            _context.Entry(sender).State = EntityState.Modified; 
+                            _context.SaveChanges(); // SAVE CHANGED INFO TO DATABASE
+
+                            // PERFORM ENCRYPTION
+                            ICryptoTransform encryptor = aes.CreateEncryptor(); // INITIALIZE A NEW ENCYPTOR
+                            using (CryptoStream cs = new CryptoStream(fsOutput, encryptor, CryptoStreamMode.Write))
+                            {
+                                fsInput.CopyTo(cs); // ENCRYPT AND SAVE ENCRYPTED DATA TO "EncryptedFile"
+                            }
+                        }
+                    }
                 }
 
-                return stringBuilder.ToString();
+                Messages message = new Messages(); // CREATE NEW MESSAGE 
+                message.messageBody = outputFilePath; // MESAGE BODY WILL BE THE OUTPUT FILE PATH
+                _context.Messages.Add(message); // SAVE MESSAGE TO DATABASE
+                _context.SaveChanges(); 
             }
-        }
 
-        [HttpGet("deneme")]
-        public void deneme()
-        {
-            var sender = _context.Users.FirstOrDefault(u=>u.username == "A");
-
-            
-            using (RSA rsa = RSA.Create())
+            else // DUPLICATED FILE DETECTED
             {
+                // DELETE DUPLICATE MESSAGE FIRST -> THEN CONTINUE
+                _context.Messages.Where(m => m.messageBody == filePath).ExecuteDelete();
 
-                //Get the public and private key
-                string publicKeyString = "MIIBCgKCAQEAwO+gC1T6RbysX40oUYs6M/DbXsnY4N4xF0qRnw8tG+vqk8+x5B3EN+7+BKwLfZQxky2o1IvmpJbTleRyPE/zcQKqz0nH+85w1vuvT4iXnhZg6lkNBNLcqILb3RD3Un5F+CkMgAWoy/A9M0Xf3pqWg6mvA6uLEPq2Z"; // Replace this with your actual public key string
-                                                                                                                                                                                                                                                                                                 //string privateKeyString ="acacxascascascascascs"; // Replace this with your actual private key string
+                // SAME PROCEDURES AS ABOVE
+                // SAME PROCEDURES AS ABOVE
+                // SAME PROCEDURES AS ABOVE
 
-                var message = _context.Messages.ToList()[0];
-                
+                string outputFilePath = Path.Combine(
+                   Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "EncryptedFile" + Path.GetExtension(filePath));
 
-                
+                // ENCRYPTION
+                using (FileStream fsInput = new FileStream(filePath, FileMode.Open))
+                {
+                    using (FileStream fsOutput = new FileStream(outputFilePath, FileMode.Create))
+                    {
+                        using (AesManaged aes = new AesManaged())
+                        {
+                            aes.GenerateKey();
+                            aes.GenerateIV();
 
-                string pemX509 = "-----BEGIN PUBLIC KEY-----"
-                +publicKeyString+
-                "-----END PUBLIC KEY-----";
+                            var sender = _context.Users.FirstOrDefault(u => u.username == "A");
+                            sender.aesKey = aes.Key;
+                            sender.aesIV = aes.IV;
+                            _context.Entry(sender).State = EntityState.Modified;
+                            _context.SaveChanges(); // SAVE aes key and aes ıv
 
-                //rsa.ImportFromPem(pemX509);
+                            // PERFORM ENCRYPTION
+                            ICryptoTransform encryptor = aes.CreateEncryptor();
+                            using (CryptoStream cs = new CryptoStream(fsOutput, encryptor, CryptoStreamMode.Write))
+                            {
+                                fsInput.CopyTo(cs);
+                            }
+                        }
+                    }
+                }
 
-                //var decryptedBytes = rsa.Decrypt(
-                  //Convert.FromBase64String(Convert.ToBase64String(Convert.FromBase64String(message.digitalSignature))),
-                  //RSAEncryptionPadding.Pkcs1
-                //);
-
-
-
-                
-                //publicKeyString.Replace('_', '/').Replace('-', '+');
-
-                //rsa.ImportFromPem(pemX509);
-
-                // Import the keys from the strings
-                rsa.ImportRSAPublicKey(Encoding.UTF8.GetBytes(pemX509), out _);
-                //rsa.ImportRSAPrivateKey(Convert.FromBase64String(), out _);
-
-                
-                // The string to be encrypted and decrypted
-                string originalString = "Hello, this is a test string.";
-
-                // Encrypt the string using the public key
-                byte[] encryptedData = rsa.Encrypt(Encoding.UTF8.GetBytes(originalString), RSAEncryptionPadding.OaepSHA256);
-                string encryptedString = Convert.ToBase64String(encryptedData);
-
-                System.Diagnostics.Debug.WriteLine("Encrypted String: " + encryptedString);
-
-                // Decrypt the encrypted string using the private key
-                byte[] decryptedData = rsa.Decrypt(Convert.FromBase64String(encryptedString), RSAEncryptionPadding.OaepSHA256);
-                string decryptedString = Encoding.UTF8.GetString(decryptedData);
-
-                System.Diagnostics.Debug.WriteLine("Decrypted String: " + decryptedString);
-                
+                Messages message = new Messages();
+                message.messageBody = outputFilePath;
+                _context.Messages.Add(message);
+                _context.SaveChanges();
             }
-            
-            
+
+
+
         }
 
+        // DECRYPT SELECTED FILE WITH SYMMETRIC AES DECRYPTION
+        [HttpGet("symmetricDecryption")]
+        public void symmetricDecryption (string filePath)
+        {
+            // SET OUTPUT FILE PATH AS "DecryptedFile"
+            // DECRYPTED FILE WILL BE SAVED TO YOUR LOCAL DESKTOP
+            string outputFilePath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "DecryptedFile" + Path.GetExtension(filePath));
+
+            // DECRYPTION PROCESS
+            using (FileStream fsInput = new FileStream(filePath, FileMode.Open)) // OPEN SELECTED FILE IN THE FILEPATH
+            {
+                using (FileStream fsOutput = new FileStream(outputFilePath, FileMode.Create)) // CREATE A NEW OUTPUT FILE AS "DecrpytedFile"
+                {
+                    using (AesManaged aes = new AesManaged())
+                    {
+                        // RETRIEVE THE SYMMETRIC AES KEY FROM USER A (SENDER)
+                        
+                        var sender = _context.Users.FirstOrDefault(u=>u.username=="A"); // FIND THE INFO ABOUT SENDER
+                        aes.Key = sender.aesKey; // GET THE SYMMETRIC AES KEY
+                        aes.IV = sender.aesIV;
+
+                        // PERFORM DECRYPTION
+                        ICryptoTransform decryptor = aes.CreateDecryptor(); // CREATE A NEW DECRYPTOR
+                        using (CryptoStream cs = new CryptoStream(fsOutput, decryptor, CryptoStreamMode.Write))
+                        {
+                            fsInput.CopyTo(cs); // SAVE DECRYPTED DATA AS "DecrpytedFile" TO LOCAL DESKTOP
+                        }
+                    }
+                }
+            }
+        }
+
+
+        // ENCRYPT FILE WITH AES SYMMETRIC ENCRYPTION THEN CREATE DIGITAL SIGNATURE
+        [HttpGet("signAndEncrypt")]
+        public string signAndEncrypt(string filePath)
+        {
+            try
+            {
+                symmetricEncrypion(filePath); // ENCRYPT FILE WITH AES THEN SAVE TO DATABASE
+                createDigitalSignature(filePath); // CREATE DIGITAL SIGNATURE OF THE FILE THEN SAVE TO DATABASE
+
+                // GET SAVED FILE AFTER SYMMETRIC ENCRYPTION FUNCTION CALL
+                Messages encryptedFile = _context.Messages.Where(m=>m.messageBody.Contains("EncryptedFile")).FirstOrDefault();
+
+                // GET SAVED FILE AFTER CREATE DIGITAL SIGNATURE FUNCTION CALL
+                Messages signedFile = _context.Messages.Where(m => m.messageBody == filePath).FirstOrDefault();
+
+                // CREATE NEW MESSAGE
+                Messages combined = new Messages();
+
+                // COMBINE THE DIGITAL SIGNATURE + ENCRYPED FILE PATH (AS MESSAGE BODY)
+                combined.messageBody = encryptedFile.messageBody;
+                combined.digitalSignature = signedFile.digitalSignature;
+
+                // DELETE SAVED FILE AFTER THE FUNCTION CALLS
+                _context.Messages.Where(m => m.messageBody.Contains("EncryptedFile")).ExecuteDelete();
+                _context.Messages.Where(m => m.messageBody == filePath).ExecuteDelete();
+
+                // SAVE COMBINED MESSAGE (BOTH SIGNED AND ENCRYPTED) TO DATABASE
+                _context.Messages.Add(combined);
+                _context.SaveChanges();
+                return "SUCCESS"; // RETURN STATUS MESSAGE
+            }
+            catch(Exception ex)
+            {
+                return "FAILED"; // RETURN STATUS MESSAGE
+
+            }
+        }
+
+
+        // FIRST DECRYPT THEN VERIFY DIGITAL SIGNATURE OF THE SELECTED FILE
+        [HttpGet("decryptAndVerify")]
+        public string decryptAndVerify(string filePath)
+        {
+            try
+            {
+                symmetricDecryption(filePath); // AES DECRYPTION
+                verifyDigitalSignature(filePath); // SIGNATURE VERIFICATION
+                
+                return "SUCCESS"; // RETURN STATUS MESSAGE
+            }
+            catch(Exception ex)
+            { 
+                return "FAILED"; // RETURN STATUS MESSAGE
+
+            }
+        }
+
+        // CREATES DIGITAL SIGNATURE FOR SELECTED FILE
         [HttpGet("createDigitalSignature")]
-        public List<string> createDigitalSignature(string message) 
+        public string createDigitalSignature(string filePath) 
         {
-            string hashedMessage = hashMessage(message); // HASH MESSAGE BODY WITH SHA - 512 
 
-            var sender = _context.Users.FirstOrDefault(u => u.username == "A"); // FIND USER "A"
-
-            RSACryptoServiceProvider csp = new RSACryptoServiceProvider(2048);
-
-            var privateKey = csp.ExportParameters(true);
-            var publicKey = csp.ExportParameters(false);
-
-            string privKeyString;
+            var checkDuplicate = _context.Messages.FirstOrDefault(m => m.messageBody == filePath); // CHECK DUPLICATE FILES
+            if (checkDuplicate == null) // NO DUPLICATED FILE THEN CONTINUE
             {
-                //we need some buffer
-                var sw = new System.IO.StringWriter();
-                //we need a serializer
-                var xs = new System.Xml.Serialization.XmlSerializer(typeof(RSAParameters));
-                //serialize the key into the stream
-                xs.Serialize(sw, privateKey);
-                //get the string from the stream
-                privKeyString = sw.ToString();
+                string hashedMessage = hashMessage(filePath); // HASH THE FILE IN THE GIVEN FILE PATH INPUT
+                var sender = _context.Users.FirstOrDefault(u => u.username == "A"); // FIND USER "A" (SENDER)
+                var receiver = _context.Users.FirstOrDefault(u => u.username == "B"); // FIND USER "B" (RECEIVER)
+
+                // INITIALIZE ASYMMETRIC RSA ALGORITHM WITH 4096 BIT KEY LENGTH
+                RSACryptoServiceProvider csp = new RSACryptoServiceProvider(4096); 
+
+                var privateKey = csp.ExportParameters(false); // GET PRIVATE KEY
+                var publicKey = csp.ExportParameters(true); // GET PUBLIC KEY
+
+                // GET PRIVATE KEY AS STRING
+                string privKeyString;
+                {
+
+                    var sw = new System.IO.StringWriter();
+                    var xs = new System.Xml.Serialization.XmlSerializer(typeof(RSAParameters));
+                    xs.Serialize(sw, privateKey);
+                    privKeyString = sw.ToString(); // GET PRIVATE KEY AS STRING
+                }
+
+                // SAVE TO SENDER (USER A)'S PRIVATE KEY
+                sender.privateKey = privKeyString;
+
+                // GET PUBLIC KEY AS STRING
+                string pubKeyString;
+                {
+                    var sw = new System.IO.StringWriter();
+                    var xs = new System.Xml.Serialization.XmlSerializer(typeof(RSAParameters));
+                    xs.Serialize(sw, publicKey);
+                    pubKeyString = sw.ToString(); // GET PUBLIC KEY AS STRING
+                }
+
+                // SAVE TO SENDER (USER A)'S PUBLIC KEY
+                sender.publicKey = pubKeyString;
+
+                _context.Entry(sender).State = EntityState.Modified;
+                _context.SaveChanges(); // SAVE PUBLIC & PRIVATE KEY OF SENDER TO THE DATABASE
+
+                // LOAD PRIVATE KEY TO THE RSA ALGORITHM (TO ENCRYPT HASHED MESSAGE WITH SENDER'S PRIVATE KEY)
+                csp = new RSACryptoServiceProvider();
+                csp.ImportParameters(privateKey); // IMPORT PRIVATE KEY
+
+                // HASHED MESSAGE
+                var plainTextData = hashedMessage;
+
+                // GET BYTES 
+                var bytesPlainTextData = Encoding.Unicode.GetBytes(plainTextData);
+
+                // APPLY PKCS 1.5 PADDING AND ENCRYPT THE HASHED MESSAGE
+                var bytesCypherText = csp.Encrypt(bytesPlainTextData, false);
+
+                // GET THE STRING REPRESENTATION OF THE CYPHER TEXT
+                var cypherText = Convert.ToBase64String(bytesCypherText);
+
+                // SAVE MESSAGE BODY + SENDER PRIVATE KEY-ENCRYPTED HASHED MESSAGE
+                Messages signedMessage = new Messages();
+                signedMessage.digitalSignature = cypherText;
+                signedMessage.messageBody = filePath;
+                _context.Messages.Add(signedMessage);
+                _context.SaveChanges();
+
+                List<string> messageBody = new List<string>();
+
+                messageBody.Add(filePath); // PLAIN TEXT MESSAGE
+                messageBody.Add(cypherText); // SENDER PRIVATE KEY ENCRYPTED HASHED MESSAGE
+
+                return cypherText; // RETURN 
+
             }
 
-            sender.privateKey = privKeyString;
-
-            string pubKeyString;
+            else // DUPLICATED FILE DETECTED
             {
-                //we need some buffer
-                var sw = new System.IO.StringWriter();
-                //we need a serializer
-                var xs = new System.Xml.Serialization.XmlSerializer(typeof(RSAParameters));
-                //serialize the key into the stream
-                xs.Serialize(sw, publicKey);
-                //get the string from the stream
-                pubKeyString = sw.ToString();
+                // DELETE DUPLICATE FILE FROM DB
+                _context.Messages.Where(m=>m.messageBody == filePath).ExecuteDelete();
+                _context.SaveChanges(true);
+
+                // SAME OPERATIONS 
+                string hashedMessage = hashMessage(filePath); // HASH THE FILE IN THE GIVEN FILE PATH INPUT
+
+                var sender = _context.Users.FirstOrDefault(u => u.username == "A"); // FIND USER "A"
+                var receiver = _context.Users.FirstOrDefault(u => u.username == "B"); // FIND USER "B"
+
+                RSACryptoServiceProvider csp = new RSACryptoServiceProvider(4096);
+
+                var privateKey = csp.ExportParameters(false); // GET PRIVATE KEY
+                var publicKey = csp.ExportParameters(true); // GET PUBLIC KEY
+
+                string privKeyString;
+                {
+
+                    var sw = new System.IO.StringWriter();
+                    var xs = new System.Xml.Serialization.XmlSerializer(typeof(RSAParameters));
+                    xs.Serialize(sw, privateKey);
+                    privKeyString = sw.ToString(); // GET PRIVATE KEY AS STRING
+                }
+
+                sender.privateKey = privKeyString;
+
+                string pubKeyString;
+                {
+                    var sw = new System.IO.StringWriter();
+                    var xs = new System.Xml.Serialization.XmlSerializer(typeof(RSAParameters));
+                    xs.Serialize(sw, publicKey);
+                    pubKeyString = sw.ToString(); // GET PUBLIC KEY AS STRING
+                }
+
+                sender.publicKey = pubKeyString;
+
+                _context.Entry(sender).State = EntityState.Modified;
+                _context.SaveChanges(); // SAVE PUBLIC & PRIVATE KEY TO THE DATABASE
+
+                // LOAD PRIVATE KEY TO THE RSA (TO ENCRYPT HASHED MESSAGE WITH SENDER'S PRIVATE KEY)
+                csp = new RSACryptoServiceProvider();
+                csp.ImportParameters(privateKey); // IMPORT PRIVATE KEY
+
+                // HASHED MESSAGE
+                var plainTextData = hashedMessage;
+
+                // GET BYTES 
+                var bytesPlainTextData = Encoding.Unicode.GetBytes(plainTextData);
+
+                // APPLY PKCS 1.5 PADDING AND ENCRYPT THE HASHED MESSAGE
+                var bytesCypherText = csp.Encrypt(bytesPlainTextData, false);
+
+                // GET THE STRING REPRESENTATION OF THE CYPHER TEXT
+                var cypherText = Convert.ToBase64String(bytesCypherText);
+
+                // SAVE MESSAGE BODY + SENDER PRIVATE KEY-ENCRYPTED HASHED MESSAGE
+                Messages signedMessage = new Messages();
+                signedMessage.digitalSignature = cypherText;
+                signedMessage.messageBody = filePath;
+                _context.Messages.Add(signedMessage);
+                _context.SaveChanges();
+
+                List<string> messageBody = new List<string>();
+
+                messageBody.Add(filePath); // PLAIN TEXT MESSAGE
+                messageBody.Add(cypherText); // SENDER PRIVATE KEY ENCRYPTED HASHED MESSAGE
+
+                return cypherText;
+
             }
 
-
-            sender.publicKey = pubKeyString;
-
-            _context.Entry(sender).State = EntityState.Modified;
-            _context.SaveChanges();
-
-            //converting it back
-            {
-                //get a stream from the string
-                var sr = new System.IO.StringReader(privKeyString);
-                //we need a deserializer
-                var xs = new System.Xml.Serialization.XmlSerializer(typeof(RSAParameters));
-                //get the object back from the stream
-                publicKey = (RSAParameters)xs.Deserialize(sr);
-            }
-
-            //conversion for the private key is no black magic either ... omitted
-
-            //we have a public key ... let's get a new csp and load that key
-            csp = new RSACryptoServiceProvider();
-            csp.ImportParameters(privateKey);
-
-            //we need some data to encrypt
-            var plainTextData = message;
-
-            //for encryption, always handle bytes...
-            var bytesPlainTextData = System.Text.Encoding.Unicode.GetBytes(plainTextData);
-
-            //apply pkcs#1.5 padding and encrypt our data 
-            var bytesCypherText = csp.Encrypt(bytesPlainTextData, false);
-
-            //we might want a string representation of our cypher text... base64 will do
-            var cypherText = Convert.ToBase64String(bytesCypherText);
-
-
-            _context.Messages.ExecuteDelete();
-            _context.SaveChanges();
-
-            // SAVE MESSAGE BODY + SENDER PRIVATE KEY-ENCRYPTED HASHED MESSAGE
-            Messages signedMessage = new Messages();
-            signedMessage.digitalSignature = cypherText;
-            signedMessage.messageBody = message;
-            _context.Messages.Add(signedMessage);
-            _context.SaveChanges();
-
-            List<string> messageBody = new List<string>();
-
-            messageBody.Add(message); // PLAIN TEXT MESSAGE
-            messageBody.Add(cypherText); // SENDER PRIVATE KEY ENCRYPTED HASHED MESSAGE
-            return messageBody;
+           
         }
 
-
-        [HttpGet("verifyDigitalSignature")]
-        public byte[] verifyDigitalSignature(Messages message)
+        // FUNCTION THAT CHECKS DIGITAL SIGNATURE
+        [HttpGet("checkDigitalSignature")]
+        public string checkDigitalSignature(Messages message)
         {
-            var bytesCypherText = Convert.FromBase64String(message.digitalSignature);
+            // CONVERT MESSAGE TO BYTE ARRAY
+            var bytesCypherText = Convert.FromBase64String(message.digitalSignature); 
 
-            var sender = _context.Users.FirstOrDefault(e => e.username == "A");
-
-            
+            var sender = _context.Users.FirstOrDefault(e => e.username == "A"); // GET THE SENDER DATA
 
             using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider())
             {
-                rsa.FromXmlString(sender.publicKey);
+                rsa.FromXmlString(sender.publicKey); // DECRYPT THE DIGITAL SIGNATURE WITH SENDER'S PUBLIC KEY
 
-                byte[] decryptedData = rsa.Decrypt(bytesCypherText,false);
-
-                return decryptedData;
-            }
-            
-        }
-
-        [HttpGet("test")]
-        public string test()
-        {
-            var message = _context.Messages.ToList()[0];
-            byte[] decrypt = verifyDigitalSignature(message);
-            return Encoding.UTF8.GetString(decrypt);
-        }
-
-        [HttpGet("hashMessage")]
-        public string hashMessage(string message) // Take sender's (A) private key than sign it
-        {
-            using (SHA512 hash = SHA512.Create()) 
-            {
-                byte[] bytes = Encoding.UTF8.GetBytes(message); // CONVERT MESSAGE INPUT INTO BYTE ARRAY
-                byte[] hashBytes = hash.ComputeHash(bytes);  // HASH THE MESSAGE CONVERTED TO BYTE ARRAY
-
-                StringBuilder stringBuilder = new StringBuilder();
-                for (int i = 0; i < hashBytes.Length; i++)
+                try
                 {
-                    stringBuilder.Append(hashBytes[i].ToString("x2")); // CONVERT CALCUALTED HASH BYTE[] TO STRING
+                    byte[] decryptedData = rsa.Decrypt(bytesCypherText, false); // DECRYPTION PROCESS
+                    string hashedMessageBody = hashMessage(message.messageBody); // GET THE HASH VALUE OF THE MESSAGE BODY (PLAIN TEXT)
+                    string decryptedSignature = Encoding.Unicode.GetString(decryptedData);
+
+                    if (hashedMessageBody == decryptedSignature) // IF HASHED MESSAGE BODY = DECRYPTED DIGITAL SIGNATURE
+                    {
+                        return "VERIFIED";
+
+                    }
+                    else // IF NOT THEN MESSAGE IS CHANGED 
+                    {
+                        return "NOT VERIFIED";
+                    }
                 }
+                catch (Exception ex)
+                {
+                    return "NOT VERIFIED";
 
-                return stringBuilder.ToString(); // RETURN HASHED VALUE
-
+                }               
             }
         }
 
+        // TAKE A FILE PATH THEN VERIFY DIGITAL SIGNATURE OF THE FILE 
+        [HttpGet("verifyDigitalSignature")]
+        public string verifyDigitalSignature(string message)
+        {
+            var messageData = _context.Messages.FirstOrDefault(m => m.messageBody == message); // FIND THE MESSAGE DATA FROM MESSAGE BODY
+            if (messageData == null)
+            {
+                return "Cannot find the message !";
 
+            }
+            else
+            {
+                return checkDigitalSignature(messageData);  // CALL SIGNATURE-CHECKER FUNCTION ABOVE
+
+            }
+
+        }
+
+
+       
+        // CALCULATE THE SHA-512 HASH VALUE OF GIVEN FILE 
+        [HttpGet("hashMessage")]
+        public string hashMessage(string filePath) // Take sender's (A) private key than sign it
+        {
+            
+            using (SHA512 hash = SHA512.Create()) // CREATE SHA-512
+            {
+                
+                using (FileStream stream = System.IO.File.Open(filePath,FileMode.Open)) // OPEN FILE
+                {
+                    byte[] hashBytes = hash.ComputeHash(stream);  // HASH THE MESSAGE CONVERTED TO BYTE ARRAY
+                    StringBuilder stringBuilder = new StringBuilder();
+                    for (int i = 0; i < hashBytes.Length; i++)
+                    {
+                        stringBuilder.Append(hashBytes[i].ToString("x2")); // CONVERT CALCUALTED HASH BYTE[] TO STRING
+                    }
+                    return stringBuilder.ToString(); // RETURN HASHED VALUE
+
+                }
+            }
+        }
+
+        // GET ALL USERS INFO FROM DATABASE
         [HttpGet("getAll")]
         public async Task<ActionResult<List<Users>>> getAll()
         {

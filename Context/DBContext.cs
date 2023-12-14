@@ -5,6 +5,7 @@ using System.Reflection.Emit;
 
 namespace PUBLIC_KEY_INFRASTRUCTURE.Context
 {
+    // DATABASE SETTINGS AND ENTITY FRAMEWORK CONFIGURATION
     public class DBContext : DbContext
     {
         private readonly IConfiguration config;

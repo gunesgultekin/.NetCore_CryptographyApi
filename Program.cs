@@ -10,29 +10,28 @@ namespace PUBLIC_KEY_INFRASTRUCTURE
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
+            // SERVICES
 
             builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+            
             builder.Services.AddEndpointsApiExplorer();
 
+            // ENTITY FRAMEWORK DBCONTEXT CONFIGURATION
             builder.Services.AddDbContext<DBContext>(
                 option => option.UseSqlServer(connectionConfiguration.connectionString));
             builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
-                app.UseSwagger();
+                app.UseSwagger(); // ADD SWAGGER UI 
                 app.UseSwaggerUI();
             }
 
             app.UseHttpsRedirection();
 
             app.UseAuthorization();
-
 
             app.MapControllers();
 
